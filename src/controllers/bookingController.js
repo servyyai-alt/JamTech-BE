@@ -1,9 +1,9 @@
 import catchAsync from "../utils/catchAsync.js";
 import AppError from "../utils/AppError.js";
 import ServiceBooking, { REPAIR_STATUS_LIST } from "../models/ServiceBooking.js";
-import RepairPrice from "../models/RepairPrice.js";
 import { generateBookingNumber } from "../utils/generateBookingNumber.js";
 import APIFeatures from "../utils/apiFeatures.js";
+import { findBestRepairPrice } from "../services/repairPricing.js";
 
 const POPULATE = "deviceCategory brand deviceModel deviceVariant repairService repairPrice";
 
@@ -25,9 +25,9 @@ export const createBooking = catchAsync(async (req, res, next) => {
     return next(new AppError("Missing required booking fields.", 400));
   }
 
-  const priceFilter = { deviceModel, repairService, isActive: true };
-  if (deviceVariant) priceFilter.deviceVariant = deviceVariant;
-  const repairPrice = await RepairPrice.findOne(priceFilter);
+  const repairPrice = await findBestRepairPrice({
+    category: deviceCategory, brand, model: deviceModel, variant: deviceVariant, service: repairService,
+  });
   if (!repairPrice) return next(new AppError("No pricing available for this repair configuration.", 400));
 
   const finalPrice = repairPrice.discountPrice && repairPrice.discountPrice < repairPrice.regularPrice

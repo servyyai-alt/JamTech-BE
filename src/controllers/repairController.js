@@ -4,14 +4,19 @@ import RepairService from "../models/RepairService.js";
 import RepairPrice from "../models/RepairPrice.js";
 import { getAll, getOne, createOne, updateOne, deleteOne } from "../utils/handlerFactory.js";
 import slugify from "slugify";
+import { findBestRepairPrice } from "../services/repairPricing.js";
 
-// Repair services filtered by compatibility (category/brand/model)
+// Services are configured by category. Model-specific compatibility is no
+// longer required for a device to receive the category's standard repairs.
 export const getRepairServices = catchAsync(async (req, res) => {
-  const { category, brand, model } = req.query;
+  const { category } = req.query;
   const filter = { isActive: true };
-  if (category) filter.compatibleCategories = category;
-  if (brand) filter.compatibleBrands = brand;
-  if (model) filter.compatibleModels = model;
+  if (category) {
+    filter.$or = [
+      { compatibleCategories: category },
+      { compatibleCategories: { $size: 0 } },
+    ];
+  }
 
   const services = await RepairService.find(filter).sort("sortOrder name");
   res.status(200).json({ success: true, results: services.length, data: services });
@@ -26,18 +31,17 @@ export const createRepairService = catchAsync(async (req, res) => {
 export const updateRepairService = updateOne(RepairService);
 export const deleteRepairService = deleteOne(RepairService);
 
-// Repair pricing lookup: Category > Brand > Model > Variant > Service
+// Pricing lookup: category default, then optional brand/model/variant override.
 export const getRepairPrice = catchAsync(async (req, res, next) => {
-  const { model, variant, service } = req.query;
-  if (!model || !service) return next(new AppError("model and service are required query params.", 400));
+  const { category, brand, model, variant, service } = req.query;
+  if (!category || !service) return next(new AppError("category and service are required query params.", 400));
 
-  const filter = { deviceModel: model, repairService: service, isActive: true };
-  if (variant) filter.deviceVariant = variant;
+  const price = await findBestRepairPrice({ category, brand, model, variant, service });
 
-  const price = await RepairPrice.findOne(filter)
-    .populate("deviceCategory brand deviceModel deviceVariant repairService");
-
-  if (!price) return next(new AppError("No pricing found for this configuration.", 404));
+  // A repair can still be requested when no fixed price is configured.
+  // This avoids hiding services from customers and routes them to a manual quote.
+  if (!price) return res.status(200).json({ success: true, data: { isQuoteOnly: true } });
+  await price.populate("deviceCategory brand deviceModel deviceVariant repairService");
   res.status(200).json({ success: true, data: price });
 });
 

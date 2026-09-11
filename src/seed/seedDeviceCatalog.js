@@ -8,6 +8,8 @@ import DeviceCategory from "../models/DeviceCategory.js";
 import Brand from "../models/Brand.js";
 import DeviceModel from "../models/DeviceModel.js";
 import DeviceVariant from "../models/DeviceVariant.js";
+import RepairService from "../models/RepairService.js";
+import RepairPrice from "../models/RepairPrice.js";
 
 const slug = (value) => slugify(value, { lower: true, strict: true });
 
@@ -242,7 +244,36 @@ const run = async () => {
     }
   }
 
-  console.log(`Device catalogue complete. Added ${addedBrands} brands, ${addedModels} models, and ${addedVariants} variants. Existing data was preserved.`);
+  // One price per category + service is enough for every model in that category.
+  // Administrators can later add a brand/model/variant row to override it.
+  const defaultPriceList = {
+    Smartphones: { "Screen Replacement": 99, "Battery Replacement": 59, "Charging Port Repair": 69, "Camera Repair": 79, "Water Damage Treatment": 89, "Software Diagnostics": 29, "General Diagnostics": 29 },
+    Tablets: { "Screen Replacement": 129, "Battery Replacement": 79, "Charging Port Repair": 79, "Camera Repair": 89, "Water Damage Treatment": 99, "Software Diagnostics": 29, "General Diagnostics": 29 },
+    Computers: { "Screen Replacement": 179, "Battery Replacement": 99, "Keyboard Replacement": 89, "RAM Upgrade": 69, "SSD/HDD Replacement": 99, "Water Damage Treatment": 119, "Software Diagnostics": 39, "General Diagnostics": 39 },
+    "Gaming Devices": { "HDMI Port Repair": 89, "Controller Connectivity Fix": 39, "Software Diagnostics": 29, "General Diagnostics": 29, "Water Damage Treatment": 79 },
+  };
+  const categoryRecords = await DeviceCategory.find({ name: { $in: Object.keys(defaultPriceList) } });
+  const repairServices = await RepairService.find({ isActive: true });
+  let addedDefaultPrices = 0;
+  for (const deviceCategory of categoryRecords) {
+    for (const service of repairServices) {
+      const regularPrice = defaultPriceList[deviceCategory.name]?.[service.name];
+      if (!regularPrice) continue;
+      const existingDefault = await RepairPrice.exists({
+        deviceCategory: deviceCategory._id,
+        repairService: service._id,
+        brand: { $exists: false },
+        deviceModel: { $exists: false },
+        deviceVariant: { $exists: false },
+      });
+      if (!existingDefault) {
+        await RepairPrice.create({ deviceCategory: deviceCategory._id, repairService: service._id, regularPrice, isActive: true });
+        addedDefaultPrices += 1;
+      }
+    }
+  }
+
+  console.log(`Device catalogue complete. Added ${addedBrands} brands, ${addedModels} models, ${addedVariants} variants, and ${addedDefaultPrices} default repair prices. Existing data was preserved.`);
   await mongoose.disconnect();
 };
 
