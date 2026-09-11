@@ -58,6 +58,30 @@ export const createBooking = catchAsync(async (req, res, next) => {
   res.status(201).json({ success: true, data: booking });
 });
 
+// Creates a booking for an unlisted device. An admin reviews it and supplies a quote.
+export const createManualQuote = catchAsync(async (req, res, next) => {
+  const { customDevice, serviceMethod, preferredDate, preferredTime, customerDetails } = req.body;
+  if (!customDevice?.brand || !customDevice?.model || !customDevice?.issue || !serviceMethod || !preferredDate || !preferredTime || !customerDetails?.name || !customerDetails?.email || !customerDetails?.phone) {
+    return next(new AppError("Please provide your device, issue, appointment, and contact details.", 400));
+  }
+
+  const booking = await ServiceBooking.create({
+    bookingNumber: await generateBookingNumber(),
+    customer: req.user ? req.user.id : undefined,
+    isManualQuote: true,
+    customDevice,
+    serviceMethod,
+    preferredDate,
+    preferredTime,
+    customerDetails,
+    status: "Pending",
+    paymentRequired: false,
+    paymentStatus: "not_required",
+  });
+
+  res.status(201).json({ success: true, data: booking });
+});
+
 // Public tracking by booking number (no auth required)
 export const trackBooking = catchAsync(async (req, res, next) => {
   const booking = await ServiceBooking.findOne({ bookingNumber: req.params.bookingNumber }).populate(POPULATE);

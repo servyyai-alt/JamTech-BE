@@ -28,13 +28,22 @@ const serviceBookingSchema = new mongoose.Schema(
   {
     bookingNumber: { type: String, required: true, unique: true }, // REP-2026-00001
     customer: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // optional guest booking
-    deviceCategory: { type: mongoose.Schema.Types.ObjectId, ref: "DeviceCategory", required: true },
-    brand: { type: mongoose.Schema.Types.ObjectId, ref: "Brand", required: true },
-    deviceModel: { type: mongoose.Schema.Types.ObjectId, ref: "DeviceModel", required: true },
+    // Catalog references are optional only for a manual quote request.
+    deviceCategory: { type: mongoose.Schema.Types.ObjectId, ref: "DeviceCategory", required() { return !this.isManualQuote; } },
+    brand: { type: mongoose.Schema.Types.ObjectId, ref: "Brand", required() { return !this.isManualQuote; } },
+    deviceModel: { type: mongoose.Schema.Types.ObjectId, ref: "DeviceModel", required() { return !this.isManualQuote; } },
     deviceVariant: { type: mongoose.Schema.Types.ObjectId, ref: "DeviceVariant" },
-    repairService: { type: mongoose.Schema.Types.ObjectId, ref: "RepairService", required: true },
-    repairPrice: { type: mongoose.Schema.Types.ObjectId, ref: "RepairPrice", required: true },
-    price: { type: Number, required: true },
+    repairService: { type: mongoose.Schema.Types.ObjectId, ref: "RepairService", required() { return !this.isManualQuote; } },
+    repairPrice: { type: mongoose.Schema.Types.ObjectId, ref: "RepairPrice", required() { return !this.isManualQuote; } },
+    price: { type: Number, required() { return !this.isManualQuote; } },
+    isManualQuote: { type: Boolean, default: false },
+    customDevice: {
+      category: String,
+      brand: { type: String, required() { return this.isManualQuote; } },
+      model: { type: String, required() { return this.isManualQuote; } },
+      variant: String,
+      issue: { type: String, required() { return this.isManualQuote; } },
+    },
 
     serviceMethod: {
       type: String,

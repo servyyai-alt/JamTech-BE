@@ -5,6 +5,7 @@ import { protect, restrictTo, optionalAuth } from "../middleware/auth.js";
 const router = express.Router();
 
 router.post("/", optionalAuth, ctrl.createBooking);
+router.post("/manual-quote", optionalAuth, ctrl.createManualQuote);
 router.get("/track/:bookingNumber", ctrl.trackBooking);
 
 router.use(protect);
