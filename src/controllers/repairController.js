@@ -7,17 +7,17 @@ import slugify from "slugify";
 import { findBestRepairPrice } from "../services/repairPricing.js";
 import { localizeDocs } from "../utils/localize.js";
 
-// Services are configured by category. Model-specific compatibility is no
-// longer required for a device to receive the category's standard repairs.
+// Services can be configured at three levels — device model, brand, and
+// device category. A service is available for the selected device only when
+// it isn't excluded by any configured constraint: if compatibleModels is
+// non-empty the model must be in it, likewise for brands and categories.
 export const getRepairServices = catchAsync(async (req, res) => {
-  const { category } = req.query;
+  const { category, brand, model } = req.query;
+
   const filter = { isActive: true };
-  if (category) {
-    filter.$or = [
-      { compatibleCategories: category },
-      { compatibleCategories: { $size: 0 } },
-    ];
-  }
+  if (model) filter.$and = (filter.$and || []).concat([{ $or: [{ compatibleModels: { $size: 0 } }, { compatibleModels: model }] }]);
+  if (brand) filter.$and = (filter.$and || []).concat([{ $or: [{ compatibleBrands: { $size: 0 } }, { compatibleBrands: brand }] }]);
+  if (category) filter.$and = (filter.$and || []).concat([{ $or: [{ compatibleCategories: { $size: 0 } }, { compatibleCategories: category }] }]);
 
   const services = await RepairService.find(filter).sort("sortOrder name");
   localizeDocs(services, req.query.lang);

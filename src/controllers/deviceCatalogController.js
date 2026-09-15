@@ -59,7 +59,7 @@ export const deleteModel = deleteOne(DeviceModel);
 export const getVariants = catchAsync(async (req, res) => {
   const filter = { isActive: true };
   if (req.query.model) filter.deviceModel = req.query.model;
-  const variants = await DeviceVariant.find(filter);
+  const variants = await DeviceVariant.find(filter).populate({ path: "deviceModel", populate: { path: "brand" } });
   localizeDocs(variants, req.query.lang);
   res.status(200).json({ success: true, results: variants.length, data: variants });
 });
