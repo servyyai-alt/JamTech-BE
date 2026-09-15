@@ -5,6 +5,7 @@ import RepairPrice from "../models/RepairPrice.js";
 import { getAll, getOne, createOne, updateOne, deleteOne } from "../utils/handlerFactory.js";
 import slugify from "slugify";
 import { findBestRepairPrice } from "../services/repairPricing.js";
+import { localizeDocs } from "../utils/localize.js";
 
 // Services are configured by category. Model-specific compatibility is no
 // longer required for a device to receive the category's standard repairs.
@@ -19,6 +20,7 @@ export const getRepairServices = catchAsync(async (req, res) => {
   }
 
   const services = await RepairService.find(filter).sort("sortOrder name");
+  localizeDocs(services, req.query.lang);
   res.status(200).json({ success: true, results: services.length, data: services });
 });
 
@@ -42,6 +44,7 @@ export const getRepairPrice = catchAsync(async (req, res, next) => {
   // This avoids hiding services from customers and routes them to a manual quote.
   if (!price) return res.status(200).json({ success: true, data: { isQuoteOnly: true } });
   await price.populate("deviceCategory brand deviceModel deviceVariant repairService");
+  localizeDocs(price, req.query.lang);
   res.status(200).json({ success: true, data: price });
 });
 

@@ -6,6 +6,7 @@ import Category from "../models/Category.js";
 import APIFeatures from "../utils/apiFeatures.js";
 import { getOne, createOne, updateOne, deleteOne } from "../utils/handlerFactory.js";
 import slugify from "slugify";
+import { localizeDocs } from "../utils/localize.js";
 
 export const getProducts = catchAsync(async (req, res) => {
   const filter = { isActive: true };
@@ -39,6 +40,7 @@ export const getProducts = catchAsync(async (req, res) => {
     Product.countDocuments(filter),
   ]);
 
+  localizeDocs(products, req.query.lang);
   res.status(200).json({ success: true, results: products.length, total, page, pages: Math.ceil(total / limit), data: products });
 });
 
@@ -48,6 +50,9 @@ export const getProductBySlug = catchAsync(async (req, res, next) => {
 
   const variants = await ProductVariant.find({ product: product._id, isActive: true });
   const related = await Product.find({ category: product.category, _id: { $ne: product._id }, isActive: true }).limit(4);
+
+  localizeDocs(product, req.query.lang);
+  localizeDocs(related, req.query.lang);
 
   res.status(200).json({ success: true, data: { product, variants, related } });
 });
@@ -74,6 +79,7 @@ export const deleteProductVariant = deleteOne(ProductVariant);
 // Categories
 export const getCategories = catchAsync(async (req, res) => {
   const categories = await Category.find({ isActive: true }).sort("sortOrder name");
+  localizeDocs(categories, req.query.lang);
   res.status(200).json({ success: true, results: categories.length, data: categories });
 });
 export const createCategory = catchAsync(async (req, res) => {

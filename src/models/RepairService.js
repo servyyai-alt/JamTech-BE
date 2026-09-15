@@ -15,6 +15,24 @@ const repairServiceSchema = new mongoose.Schema(
     compatibleModels: [{ type: mongoose.Schema.Types.ObjectId, ref: "DeviceModel" }],
     isActive: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 },
+    translations: {
+      type: new mongoose.Schema(
+        {
+          fr: new mongoose.Schema(
+            {
+              name: String,
+              shortDescription: String,
+              fullDescription: String,
+              estimatedTime: String,
+              warranty: String,
+            },
+            { _id: false }
+          ),
+        },
+        { _id: false }
+      ),
+      default: {},
+    },
   },
   { timestamps: true }
 );

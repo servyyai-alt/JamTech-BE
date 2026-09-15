@@ -4,6 +4,7 @@ import ServiceBooking, { REPAIR_STATUS_LIST } from "../models/ServiceBooking.js"
 import { generateBookingNumber } from "../utils/generateBookingNumber.js";
 import APIFeatures from "../utils/apiFeatures.js";
 import { findBestRepairPrice } from "../services/repairPricing.js";
+import { localizeDocs } from "../utils/localize.js";
 
 const POPULATE = "deviceCategory brand deviceModel deviceVariant repairService repairPrice";
 
@@ -86,17 +87,20 @@ export const createManualQuote = catchAsync(async (req, res, next) => {
 export const trackBooking = catchAsync(async (req, res, next) => {
   const booking = await ServiceBooking.findOne({ bookingNumber: req.params.bookingNumber }).populate(POPULATE);
   if (!booking) return next(new AppError("No booking found with that booking number.", 404));
+  localizeDocs(booking, req.query.lang);
   res.status(200).json({ success: true, data: booking });
 });
 
 export const getMyBookings = catchAsync(async (req, res) => {
   const bookings = await ServiceBooking.find({ customer: req.user.id }).populate(POPULATE).sort("-createdAt");
+  localizeDocs(bookings, req.query.lang);
   res.status(200).json({ success: true, results: bookings.length, data: bookings });
 });
 
 export const getBooking = catchAsync(async (req, res, next) => {
   const booking = await ServiceBooking.findById(req.params.id).populate(POPULATE);
   if (!booking) return next(new AppError("Booking not found.", 404));
+  localizeDocs(booking, req.query.lang);
   res.status(200).json({ success: true, data: booking });
 });
 
@@ -108,6 +112,7 @@ export const getAllBookings = catchAsync(async (req, res) => {
     .paginate();
   const bookings = await features.query;
   const total = await ServiceBooking.countDocuments();
+  localizeDocs(bookings, req.query.lang);
   res.status(200).json({ success: true, results: bookings.length, total, data: bookings });
 });
 

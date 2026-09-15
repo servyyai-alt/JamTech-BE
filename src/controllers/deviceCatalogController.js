@@ -5,6 +5,7 @@ import DeviceModel from "../models/DeviceModel.js";
 import DeviceVariant from "../models/DeviceVariant.js";
 import catchAsync from "../utils/catchAsync.js";
 import slugify from "slugify";
+import { localizeDocs } from "../utils/localize.js";
 
 // ---- Device Categories ----
 export const getCategories = getAll(DeviceCategory, { paginate: false });
@@ -23,6 +24,7 @@ export const getBrands = catchAsync(async (req, res) => {
   if (req.query.category) filter.deviceCategory = req.query.category;
   if (req.query.active !== "false") filter.isActive = true;
   const brands = await Brand.find(filter).populate("deviceCategory", "name").sort("sortOrder name");
+  localizeDocs(brands, req.query.lang);
   res.status(200).json({ success: true, results: brands.length, data: brands });
 });
 export const getBrand = getOne(Brand, { populate: "deviceCategory" });
@@ -41,6 +43,7 @@ export const getModels = catchAsync(async (req, res) => {
   if (req.query.category) filter.deviceCategory = req.query.category;
   if (req.query.active !== "false") filter.isActive = true;
   const models = await DeviceModel.find(filter).populate("brand deviceCategory").sort("sortOrder name");
+  localizeDocs(models, req.query.lang);
   res.status(200).json({ success: true, results: models.length, data: models });
 });
 export const getModel = getOne(DeviceModel, { populate: "brand deviceCategory" });
@@ -57,6 +60,7 @@ export const getVariants = catchAsync(async (req, res) => {
   const filter = { isActive: true };
   if (req.query.model) filter.deviceModel = req.query.model;
   const variants = await DeviceVariant.find(filter);
+  localizeDocs(variants, req.query.lang);
   res.status(200).json({ success: true, results: variants.length, data: variants });
 });
 export const getVariant = getOne(DeviceVariant);

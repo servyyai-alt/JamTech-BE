@@ -11,6 +11,18 @@ const deviceModelSchema = new mongoose.Schema(
     releaseYear: Number,
     isActive: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 },
+    translations: {
+      type: new mongoose.Schema(
+        {
+          fr: new mongoose.Schema(
+            { name: String, deviceType: String },
+            { _id: false }
+          ),
+        },
+        { _id: false }
+      ),
+      default: {},
+    },
   },
   { timestamps: true }
 );

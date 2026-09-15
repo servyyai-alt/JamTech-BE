@@ -36,6 +36,27 @@ const productSchema = new mongoose.Schema(
       metaTitle: String,
       metaDescription: String,
     },
+    translations: {
+      type: new mongoose.Schema(
+        {
+          fr: new mongoose.Schema(
+            {
+              title: String,
+              brand: String,
+              shortDescription: String,
+              description: String,
+              warranty: String,
+              returnsPolicy: String,
+              deliveryEstimate: String,
+              tags: [String],
+            },
+            { _id: false }
+          ),
+        },
+        { _id: false }
+      ),
+      default: {},
+    },
   },
   { timestamps: true }
 );

@@ -16,6 +16,30 @@ const deviceVariantSchema = new mongoose.Schema(
     operatingSystem: String,
     connectivity: String, // Wi-Fi / Cellular for tablets
     isActive: { type: Boolean, default: true },
+    translations: {
+      type: new mongoose.Schema(
+        {
+          fr: new mongoose.Schema(
+            {
+              label: String,
+              storage: String,
+              color: String,
+              network: String,
+              generation: String,
+              regionalVariant: String,
+              screenSize: String,
+              processor: String,
+              ram: String,
+              operatingSystem: String,
+              connectivity: String,
+            },
+            { _id: false }
+          ),
+        },
+        { _id: false }
+      ),
+      default: {},
+    },
   },
   { timestamps: true }
 );

@@ -1,6 +1,7 @@
 import catchAsync from "./catchAsync.js";
 import AppError from "./AppError.js";
 import APIFeatures from "./apiFeatures.js";
+import { localizeDocs } from "./localize.js";
 
 // Generic CRUD factory used for simple reference-data resources
 // (device categories, brands, models, variants, repair services, product categories, coupons, etc.)
@@ -26,6 +27,8 @@ export const getAll = (Model, options = {}) =>
     const docs = await query;
     const total = await Model.countDocuments(filter);
 
+    localizeDocs(docs, req.query.lang);
+
     res.status(200).json({ success: true, results: docs.length, total, data: docs });
   });
 
@@ -35,6 +38,7 @@ export const getOne = (Model, options = {}) =>
     if (options.populate) query = query.populate(options.populate);
     const doc = await query;
     if (!doc) return next(new AppError("No document found with that ID", 404));
+    localizeDocs(doc, req.query.lang);
     res.status(200).json({ success: true, data: doc });
   });
 

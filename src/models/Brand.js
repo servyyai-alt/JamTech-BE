@@ -8,6 +8,15 @@ const brandSchema = new mongoose.Schema(
     deviceCategory: { type: mongoose.Schema.Types.ObjectId, ref: "DeviceCategory", required: true },
     isActive: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 },
+    translations: {
+      type: new mongoose.Schema(
+        {
+          fr: new mongoose.Schema({ name: String }, { _id: false }),
+        },
+        { _id: false }
+      ),
+      default: {},
+    },
   },
   { timestamps: true }
 );
