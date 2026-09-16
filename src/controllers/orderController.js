@@ -11,11 +11,14 @@ import APIFeatures from "../utils/apiFeatures.js";
 // Calculates order totals purely from database values. Never trusts amounts sent by the client.
 export const calculateOrderTotals = async ({ items, couponCode }) => {
   let subtotal = 0;
+  let currency = "";
   const resolvedItems = [];
 
   for (const item of items) {
     const product = await Product.findById(item.productId);
     if (!product || !product.isActive) throw new Error(`Product not available: ${item.productId}`);
+
+    if (!currency) currency = product.currency || "EUR";
 
     let unitPrice = product.salePrice && product.salePrice < product.regularPrice ? product.salePrice : product.regularPrice;
     let variantDoc = null;
@@ -70,7 +73,7 @@ export const calculateOrderTotals = async ({ items, couponCode }) => {
 
   const totalAmount = Math.round((taxableAmount + taxAmount + shippingCost) * 100) / 100;
 
-  return { resolvedItems, subtotal, discountAmount, taxAmount, shippingCost, totalAmount, couponDoc };
+  return { resolvedItems, subtotal, discountAmount, taxAmount, shippingCost, totalAmount, currency: currency || "EUR", couponDoc };
 };
 
 export const createOrder = catchAsync(async (req, res, next) => {
@@ -86,7 +89,7 @@ export const createOrder = catchAsync(async (req, res, next) => {
 
   const orderNumber = await generateOrderNumber();
 
-  const order = await Order.create({
+    const order = await Order.create({
     orderNumber,
     customer: req.user ? req.user.id : undefined,
     guestEmail: req.user ? undefined : guestEmail,
@@ -101,6 +104,7 @@ export const createOrder = catchAsync(async (req, res, next) => {
     shippingCost: totals.shippingCost,
     taxAmount: totals.taxAmount,
     totalAmount: totals.totalAmount,
+    currency: totals.currency,
     status: "Pending",
     paymentStatus: "pending",
   });

@@ -15,10 +15,25 @@ const recalculateProductRating = async (productId) => {
 };
 
 export const getProductReviews = catchAsync(async (req, res) => {
-  const reviews = await Review.find({ product: req.params.productId, isApproved: true })
-    .populate("user", "name avatar")
-    .sort("-createdAt");
-  res.status(200).json({ success: true, results: reviews.length, data: reviews });
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+  const skip = (page - 1) * limit;
+  const filter = { product: req.params.productId, isApproved: true };
+
+  const [reviews, total] = await Promise.all([
+    Review.find(filter).populate("user", "name avatar").sort("-createdAt").skip(skip).limit(limit),
+    Review.countDocuments(filter),
+  ]);
+
+  res.status(200).json({
+    success: true,
+    results: reviews.length,
+    total,
+    totalPages: Math.ceil(total / limit),
+    page,
+    limit,
+    data: reviews,
+  });
 });
 
 export const createReview = catchAsync(async (req, res, next) => {
