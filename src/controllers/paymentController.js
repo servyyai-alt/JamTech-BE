@@ -3,26 +3,31 @@ import AppError from "../utils/AppError.js";
 import Payment from "../models/Payment.js";
 import Order from "../models/Order.js";
 import ServiceBooking from "../models/ServiceBooking.js";
-import { createPaymentSession, submitAdditionalDetails, validateHmacSignature } from "../services/adyenService.js";
+import Stripe from "stripe";
 import crypto from "crypto";
+import dotenv from "dotenv";
+
+dotenv.config();
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_123');
 
 // POST /api/payments/session
-// Creates an Adyen Checkout session for an existing order or booking.
-// The amount is ALWAYS read from the database record, never from the request body.
+// Creates a Stripe Checkout session for an existing order or booking.
 export const createSession = catchAsync(async (req, res, next) => {
-  const { referenceType, referenceId } = req.body; // "order" | "booking"
+  const { referenceType, referenceId } = req.body;
 
-  let record, amount, currency;
+  let record, amount, currency, name;
   if (referenceType === "order") {
     record = await Order.findById(referenceId);
     if (!record) return next(new AppError("Order not found.", 404));
     amount = record.totalAmount;
-    currency = record.currency;
+    currency = record.currency || "EUR";
+    name = `Order ${record.orderNumber}`;
   } else if (referenceType === "booking") {
-    record = await ServiceBooking.findById(referenceId);
+    record = await ServiceBooking.findById(referenceId).populate("repairService").populate("brand").populate("deviceModel");
     if (!record) return next(new AppError("Booking not found.", 404));
     amount = record.price;
     currency = "EUR";
+    name = `Booking ${record.bookingNumber} - ${record.repairService?.name || "Repair"}`;
   } else {
     return next(new AppError("referenceType must be 'order' or 'booking'.", 400));
   }
@@ -41,21 +46,42 @@ export const createSession = catchAsync(async (req, res, next) => {
   });
 
   try {
-    const session = await createPaymentSession({
-      amount,
-      currency,
-      merchantReference,
-      returnUrl: `${process.env.CLIENT_URL}/payment-result?ref=${merchantReference}`,
-      shopperEmail: req.user?.email || record.customerDetails?.email || record.guestEmail,
-      shopperReference: req.user?.id,
+    const successUrl = `${process.env.CLIENT_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}&ref=${merchantReference}`;
+    const cancelUrl = `${process.env.CLIENT_URL}/payment-failed?session_id={CHECKOUT_SESSION_ID}&ref=${merchantReference}`;
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [
+        {
+          price_data: {
+            currency: currency.toLowerCase(),
+            product_data: { name },
+            unit_amount: Math.round(amount * 100),
+          },
+          quantity: 1,
+        },
+      ],
+      customer_email: req.user?.email || record.customerDetails?.email || record.guestEmail,
+      client_reference_id: merchantReference,
+      metadata: {
+        paymentId: payment._id.toString(),
+        referenceType,
+        orderId: referenceType === "order" ? record._id.toString() : "",
+        bookingId: referenceType === "booking" ? record._id.toString() : "",
+      },
+      success_url: successUrl,
+      cancel_url: cancelUrl,
     });
+
+    payment.stripeSessionId = session.id;
+    payment.status = "pending";
+    await payment.save();
 
     res.status(200).json({
       success: true,
       data: {
-        sessionData: session.sessionData,
+        url: session.url,
         sessionId: session.id,
-        clientKey: process.env.ADYEN_CLIENT_KEY, // safe to expose - public key
         paymentId: payment._id,
         merchantReference,
         amount,
@@ -69,77 +95,69 @@ export const createSession = catchAsync(async (req, res, next) => {
   }
 });
 
-// POST /api/payments/details — used for additional payment actions (3DS, redirects, etc.)
-export const paymentDetails = catchAsync(async (req, res, next) => {
-  try {
-    const result = await submitAdditionalDetails(req.body);
-    res.status(200).json({ success: true, data: result });
-  } catch (err) {
-    return next(new AppError(`Failed to submit payment details: ${err.message}`, 502));
-  }
-});
-
-// GET /api/payments/status/:merchantReference — frontend polls this after redirect
+// GET /api/payments/status/:merchantReference
 export const getPaymentStatus = catchAsync(async (req, res, next) => {
   const payment = await Payment.findOne({ merchantReference: req.params.merchantReference });
   if (!payment) return next(new AppError("Payment not found.", 404));
   res.status(200).json({ success: true, data: payment });
 });
 
-// POST /api/webhooks/adyen
-// CRITICAL: verifies HMAC signature before trusting any notification, and
-// this is the SOLE source of truth for finalizing payment/order/booking status.
-export const adyenWebhook = catchAsync(async (req, res) => {
-  const notificationItems = req.body?.notificationItems || [];
+// POST /api/webhooks/stripe
+export const stripeWebhook = catchAsync(async (req, res) => {
+  const signature = req.headers["stripe-signature"];
+  let event;
 
-  for (const wrapper of notificationItems) {
-    const item = wrapper.NotificationRequestItem;
-    if (!item) continue;
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error("Stripe webhook signature verification failed.", err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
 
-    const isValid = validateHmacSignature(item);
-    if (!isValid) {
-      console.warn("Rejected Adyen webhook: invalid HMAC signature", item.merchantReference);
-      continue; // skip untrusted notifications, but still ack with [accepted] below
-    }
+  if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded" || event.type === "checkout.session.async_payment_failed") {
+    const session = event.data.object;
+    const paymentId = session.metadata.paymentId;
+    
+    if (paymentId) {
+      const payment = await Payment.findById(paymentId);
+      if (payment) {
+        payment.rawWebhookEvents.push({ eventCode: event.type, success: event.type !== "checkout.session.async_payment_failed" ? "true" : "false" });
+        payment.pspReference = session.payment_intent;
+        
+        if (event.type === "checkout.session.completed" && session.payment_status === "paid") {
+          payment.status = "paid";
+        } else if (event.type === "checkout.session.async_payment_succeeded") {
+          payment.status = "paid";
+        } else if (event.type === "checkout.session.async_payment_failed") {
+          payment.status = "failed";
+        }
+        
+        await payment.save();
 
-    const payment = await Payment.findOne({ merchantReference: item.merchantReference });
-    if (!payment) continue;
-
-    payment.pspReference = item.pspReference;
-    payment.rawWebhookEvents.push({ eventCode: item.eventCode, success: item.success });
-
-    if (item.eventCode === "AUTHORISATION") {
-      payment.status = item.success === "true" ? "authorised" : "failed";
-      payment.adyenResultCode = item.success === "true" ? "Authorised" : "Refused";
-    } else if (item.eventCode === "CAPTURE") {
-      payment.status = item.success === "true" ? "paid" : "failed";
-    } else if (item.eventCode === "REFUND") {
-      payment.status = "refunded";
-    } else if (item.eventCode === "CANCELLATION") {
-      payment.status = "cancelled";
-    }
-    await payment.save();
-
-    // Sync order/booking payment status
-    if (payment.status === "paid" || payment.status === "authorised") {
-      if (payment.referenceType === "order" && payment.order) {
-        await Order.findByIdAndUpdate(payment.order, { paymentStatus: "paid", payment: payment._id, status: "Confirmed" });
-      }
-      if (payment.referenceType === "booking" && payment.booking) {
-        await ServiceBooking.findByIdAndUpdate(payment.booking, { paymentStatus: "paid", payment: payment._id, status: "Confirmed" });
-      }
-    } else if (payment.status === "failed") {
-      if (payment.referenceType === "order" && payment.order) {
-        await Order.findByIdAndUpdate(payment.order, { paymentStatus: "failed" });
-      }
-      if (payment.referenceType === "booking" && payment.booking) {
-        await ServiceBooking.findByIdAndUpdate(payment.booking, { paymentStatus: "failed" });
+        if (payment.status === "paid") {
+          if (payment.referenceType === "order" && payment.order) {
+            await Order.findByIdAndUpdate(payment.order, { paymentStatus: "paid", payment: payment._id, status: "Confirmed" });
+          }
+          if (payment.referenceType === "booking" && payment.booking) {
+            await ServiceBooking.findByIdAndUpdate(payment.booking, { paymentStatus: "paid", payment: payment._id, status: "Confirmed" });
+          }
+        } else if (payment.status === "failed") {
+          if (payment.referenceType === "order" && payment.order) {
+            await Order.findByIdAndUpdate(payment.order, { paymentStatus: "failed" });
+          }
+          if (payment.referenceType === "booking" && payment.booking) {
+            await ServiceBooking.findByIdAndUpdate(payment.booking, { paymentStatus: "failed" });
+          }
+        }
       }
     }
   }
 
-  // Adyen requires this exact response to acknowledge receipt
-  res.status(200).send("[accepted]");
+  res.status(200).json({ received: true });
 });
 
 // ---- Admin ----

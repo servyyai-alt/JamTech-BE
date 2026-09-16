@@ -5,7 +5,6 @@ import { protect, restrictTo, optionalAuth } from "../middleware/auth.js";
 const router = express.Router();
 
 router.post("/session", optionalAuth, ctrl.createSession);
-router.post("/details", ctrl.paymentDetails);
 router.get("/status/:merchantReference", ctrl.getPaymentStatus);
 
 router.get("/", protect, restrictTo("admin"), ctrl.getAllPayments);

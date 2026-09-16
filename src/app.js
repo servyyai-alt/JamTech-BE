@@ -33,8 +33,8 @@ app.use(
 );
 app.use(morgan(process.env.NODE_ENV === "development" ? "dev" : "combined"));
 
-// Webhook route needs raw body handling in some setups; JSON is fine for Adyen's notification format
-app.use("/api/webhooks", webhookRoutes);
+// Webhook route needs raw body for Stripe signature verification
+app.use("/api/webhooks", express.raw({ type: "application/json" }), webhookRoutes);
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));

@@ -1,9 +1,9 @@
 import express from "express";
-import { adyenWebhook } from "../controllers/paymentController.js";
+import { stripeWebhook } from "../controllers/paymentController.js";
 
 const router = express.Router();
 
-// Adyen webhook — must accept raw/standard JSON, no auth (verified via HMAC instead)
-router.post("/adyen", adyenWebhook);
+// Stripe webhook — must accept raw/standard JSON, no auth (verified via signature instead)
+router.post("/stripe", stripeWebhook);
 
 export default router;

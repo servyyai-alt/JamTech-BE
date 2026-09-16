@@ -21,7 +21,7 @@ const paymentSchema = new mongoose.Schema(
       default: "created",
     },
 
-    adyenResultCode: String,
+    stripeSessionId: String,
     rawWebhookEvents: [
       {
         eventCode: String,
