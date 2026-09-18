@@ -1,22 +1,29 @@
 import mongoose from "mongoose";
 
-let isConnected = false; // Track the connection status
+let isConnected = false;
 
 const connectDB = async () => {
-  mongoose.set("strictQuery", true);
-  
   if (isConnected) {
-    console.log("MongoDB is already connected.");
     return;
   }
 
+  const mongoUri = process.env.MONGO_URI;
+
+  if (!mongoUri) {
+    throw new Error("MONGO_URI environment variable is not configured");
+  }
+
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI);
+    mongoose.set("strictQuery", true);
+    const conn = await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 5000,
+    });
+    
     isConnected = conn.connections[0].readyState === 1;
-    console.log(`MongoDB connected: ${conn.connection.host}`);
-  } catch (err) {
-    console.error(`MongoDB connection error: ${err.message}`);
-    // Do not process.exit(1) in a serverless environment
+    console.log(`MongoDB connected successfully to host: ${conn.connection.host}`);
+  } catch (error) {
+    console.error("MongoDB connection failed:", error);
+    throw error;
   }
 };
 

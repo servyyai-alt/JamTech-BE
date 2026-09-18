@@ -9,14 +9,23 @@ process.on("uncaughtException", (err) => {
   process.exit(1);
 });
 
-await connectDB();
-
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
-  console.log(`JAM Smart Tech API running on port ${PORT} [${process.env.NODE_ENV}]`);
-});
+
+let server;
+if (process.env.NODE_ENV !== "production" || process.env.LOCAL_RUN === "true") {
+  server = app.listen(PORT, () => {
+    console.log(`JAM Smart Tech API running on port ${PORT} [${process.env.NODE_ENV}]`);
+  });
+}
 
 process.on("unhandledRejection", (err) => {
   console.error("UNHANDLED REJECTION:", err);
-  server.close(() => process.exit(1));
+  if (server) {
+    server.close(() => process.exit(1));
+  } else {
+    process.exit(1);
+  }
 });
+
+// Export the Express API for serverless environments like Vercel
+export default app;
