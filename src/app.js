@@ -21,8 +21,25 @@ import settingsRoutes from "./routes/settingsRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 
 import { globalErrorHandler, notFound } from "./middleware/errorHandler.js";
+import connectDB from "./config/db.js";
 
 const app = express();
+
+// Ensure MongoDB is connected before handling any requests (Serverless optimization)
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error("Database connection failed:", error);
+    return res.status(500).json({
+      success: false,
+      status: "error",
+      message: "Database connection failed.",
+      error: error.message
+    });
+  }
+});
 
 app.use(helmet());
 app.use(

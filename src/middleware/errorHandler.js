@@ -23,6 +23,10 @@ export const globalErrorHandler = (err, req, res, next) => {
   if (error.name === "JsonWebTokenError") error = handleJWTError();
   if (error.name === "TokenExpiredError") error = handleJWTExpiredError();
 
+  if (!error.isOperational) {
+    console.error("Global Error Handler caught non-operational error:", err);
+  }
+
   res.status(error.statusCode || 500).json({
     success: false,
     status: error.status || "error",
