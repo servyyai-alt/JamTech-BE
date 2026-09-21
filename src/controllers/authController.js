@@ -47,12 +47,10 @@ export const updateMe = catchAsync(async (req, res, next) => {
 });
 
 export const changePassword = catchAsync(async (req, res, next) => {
-  const { currentPassword, newPassword } = req.body;
+  const { newPassword } = req.body;
   const user = await User.findById(req.user.id).select("+password");
 
-  if (!(await user.comparePassword(currentPassword))) {
-    return next(new AppError("Current password is incorrect.", 401));
-  }
+  // Current password check removed as requested
 
   user.password = newPassword;
   await user.save();
