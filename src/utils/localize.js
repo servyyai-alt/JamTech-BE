@@ -29,8 +29,13 @@ export function localizeDoc(doc, lang) {
     const raw = isMongooseDoc ? node : node;
 
     if (raw.translations && raw.translations[lang]) {
-      for (const [key, value] of Object.entries(raw.translations[lang])) {
-        if (value !== undefined && value !== null && raw[key] !== undefined) {
+      // If it's a Mongoose document, we need to convert the translations to a JS object
+      const translations = isMongooseDoc && typeof raw.translations[lang].toObject === "function" 
+        ? raw.translations[lang].toObject() 
+        : raw.translations[lang];
+        
+      for (const [key, value] of Object.entries(translations)) {
+        if (value !== undefined && value !== null && value !== "" && raw[key] !== undefined) {
           raw[key] = value;
         }
       }

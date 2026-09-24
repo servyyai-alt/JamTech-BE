@@ -8,7 +8,10 @@ import slugify from "slugify";
 import { localizeDocs } from "../utils/localize.js";
 
 // ---- Device Categories ----
-export const getCategories = getAll(DeviceCategory, { paginate: false });
+export const getCategories = getAll(DeviceCategory, { 
+  paginate: false,
+  baseFilter: (req) => (req.query.active !== "false" ? { isActive: true } : {}) 
+});
 export const getCategory = getOne(DeviceCategory);
 export const createCategory = catchAsync(async (req, res) => {
   if (!req.body.slug) req.body.slug = slugify(req.body.name, { lower: true });
@@ -57,7 +60,8 @@ export const deleteModel = deleteOne(DeviceModel);
 
 // ---- Device Variants ----
 export const getVariants = catchAsync(async (req, res) => {
-  const filter = { isActive: true };
+  const filter = {};
+  if (req.query.active !== "false") filter.isActive = true;
   if (req.query.model) filter.deviceModel = req.query.model;
   const variants = await DeviceVariant.find(filter).populate({ path: "deviceModel", populate: { path: "brand" } });
   localizeDocs(variants, req.query.lang);
