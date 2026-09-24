@@ -9,7 +9,8 @@ import slugify from "slugify";
 import { localizeDocs } from "../utils/localize.js";
 
 export const getProducts = catchAsync(async (req, res) => {
-  const filter = { isActive: true };
+  const filter = {};
+  if (req.query.active !== "false") filter.isActive = true;
   if (req.query.category) filter.category = req.query.category;
   if (req.query.brand) filter.brand = req.query.brand;
   if (req.query.minPrice || req.query.maxPrice) {
@@ -78,7 +79,9 @@ export const deleteProductVariant = deleteOne(ProductVariant);
 
 // Categories
 export const getCategories = catchAsync(async (req, res) => {
-  const categories = await Category.find({ isActive: true }).sort("sortOrder name");
+  const filter = {};
+  if (req.query.active !== "false") filter.isActive = true;
+  const categories = await Category.find(filter).sort("sortOrder name");
   localizeDocs(categories, req.query.lang);
   res.status(200).json({ success: true, results: categories.length, data: categories });
 });

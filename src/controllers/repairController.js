@@ -14,7 +14,8 @@ import { localizeDocs } from "../utils/localize.js";
 export const getRepairServices = catchAsync(async (req, res) => {
   const { category, brand, model } = req.query;
 
-  const filter = { isActive: true };
+  const filter = {};
+  if (req.query.active !== "false") filter.isActive = true;
   if (model) filter.$and = (filter.$and || []).concat([{ $or: [{ compatibleModels: { $size: 0 } }, { compatibleModels: model }] }]);
   if (brand) filter.$and = (filter.$and || []).concat([{ $or: [{ compatibleBrands: { $size: 0 } }, { compatibleBrands: brand }] }]);
   if (category) filter.$and = (filter.$and || []).concat([{ $or: [{ compatibleCategories: { $size: 0 } }, { compatibleCategories: category }] }]);
