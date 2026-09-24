@@ -7,7 +7,7 @@ import { sendTokenResponse } from "../utils/generateToken.js";
 export const register = catchAsync(async (req, res, next) => {
   const { name, email, phone, password } = req.body;
 
-  const existing = await User.findOne({ email });
+  const existing = await User.findOne({ email: email.toLowerCase() });
   if (existing) return next(new AppError("An account with this email already exists.", 400));
 
   const user = await User.create({ name, email, phone, password });
@@ -18,7 +18,7 @@ export const login = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
   if (!email || !password) return next(new AppError("Please provide email and password.", 400));
 
-  const user = await User.findOne({ email }).select("+password");
+  const user = await User.findOne({ email: email.toLowerCase() }).select("+password");
   if (!user || !(await user.comparePassword(password))) {
     return next(new AppError("Incorrect email or password.", 401));
   }
@@ -58,7 +58,7 @@ export const changePassword = catchAsync(async (req, res, next) => {
 });
 
 export const forgotPassword = catchAsync(async (req, res, next) => {
-  const user = await User.findOne({ email: req.body.email });
+  const user = await User.findOne({ email: req.body.email.toLowerCase() });
   if (!user) return next(new AppError("No account found with that email.", 404));
 
   const resetToken = crypto.randomBytes(32).toString("hex");
