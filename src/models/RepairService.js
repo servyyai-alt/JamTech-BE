@@ -13,6 +13,7 @@ const repairServiceSchema = new mongoose.Schema(
     compatibleCategories: [{ type: mongoose.Schema.Types.ObjectId, ref: "DeviceCategory" }],
     compatibleBrands: [{ type: mongoose.Schema.Types.ObjectId, ref: "Brand" }],
     compatibleModels: [{ type: mongoose.Schema.Types.ObjectId, ref: "DeviceModel" }],
+    compatibleVariants: [{ type: mongoose.Schema.Types.ObjectId, ref: "DeviceVariant" }],
     isActive: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 },
     translations: {
