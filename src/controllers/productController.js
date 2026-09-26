@@ -3,10 +3,30 @@ import AppError from "../utils/AppError.js";
 import Product from "../models/Product.js";
 import ProductVariant from "../models/ProductVariant.js";
 import Category from "../models/Category.js";
+import Review from "../models/Review.js";
 import APIFeatures from "../utils/apiFeatures.js";
 import { getOne, createOne, updateOne, deleteOne } from "../utils/handlerFactory.js";
 import slugify from "slugify";
 import { localizeDocs } from "../utils/localize.js";
+
+const attachReviewStats = async (products) => {
+  if (!products?.length) return products;
+
+  const ids = products.map((product) => product._id);
+  const stats = await Review.aggregate([
+    { $match: { product: { $in: ids }, isApproved: true } },
+    { $group: { _id: "$product", avgRating: { $avg: "$rating" }, count: { $sum: 1 } } },
+  ]);
+  const statsByProduct = new Map(stats.map((row) => [row._id.toString(), row]));
+
+  products.forEach((product) => {
+    const row = statsByProduct.get(product._id.toString());
+    product.rating = row?.avgRating || 0;
+    product.numReviews = row?.count || 0;
+  });
+
+  return products;
+};
 
 export const getProducts = catchAsync(async (req, res) => {
   const filter = {};
@@ -41,6 +61,7 @@ export const getProducts = catchAsync(async (req, res) => {
     Product.countDocuments(filter),
   ]);
 
+  await attachReviewStats(products);
   localizeDocs(products, req.query.lang);
   res.status(200).json({ success: true, results: products.length, total, page, pages: Math.ceil(total / limit), data: products });
 });
@@ -50,8 +71,21 @@ export const getProductBySlug = catchAsync(async (req, res, next) => {
   if (!product) return next(new AppError("Product not found.", 404));
 
   const variants = await ProductVariant.find({ product: product._id, isActive: true });
-  const related = await Product.find({ category: product.category, _id: { $ne: product._id }, isActive: true }).limit(4);
+  const categoryId = product.category?._id || product.category;
+  const relatedByCategory = await Product.find({ category: categoryId, _id: { $ne: product._id }, isActive: true })
+    .sort("-rating -numReviews -createdAt")
+    .limit(4);
+  let related = relatedByCategory;
 
+  if (related.length < 4) {
+    const usedIds = [product._id, ...related.map((item) => item._id)];
+    const fallback = await Product.find({ _id: { $nin: usedIds }, isActive: true })
+      .sort("-isBestSeller -isFeatured -rating -createdAt")
+      .limit(4 - related.length);
+    related = [...related, ...fallback];
+  }
+
+  await attachReviewStats([product, ...related]);
   localizeDocs(product, req.query.lang);
   localizeDocs(related, req.query.lang);
 

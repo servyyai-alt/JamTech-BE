@@ -15,5 +15,9 @@ const reviewSchema = new mongoose.Schema(
 );
 
 reviewSchema.index({ product: 1, user: 1 }, { unique: true });
+// serves the product reviews list: filter by product + approval, newest first
+reviewSchema.index({ product: 1, isApproved: 1, createdAt: -1 });
+// serves the star distribution summary
+reviewSchema.index({ product: 1, isApproved: 1, rating: 1 });
 
 export default mongoose.model("Review", reviewSchema);

@@ -5,6 +5,8 @@ import { protect, restrictTo } from "../middleware/auth.js";
 const router = express.Router();
 
 router.get("/product/:productId", ctrl.getProductReviews);
+router.get("/product/:productId/summary", ctrl.getProductReviewSummary);
+router.get("/product/:productId/my-review", protect, ctrl.getMyProductReview);
 router.post("/product/:productId", protect, ctrl.createReview);
 router.delete("/:id", protect, ctrl.deleteReview);
 
