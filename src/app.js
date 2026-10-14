@@ -25,6 +25,18 @@ import connectDB from "./config/db.js";
 
 const app = express();
 
+const defaultAllowedOrigins = [
+  "http://localhost:5173",
+  "https://jam-tech-fe.vercel.app",
+  "https://jamsmarttech.com",
+  "https://www.jamsmarttech.com",
+];
+const configuredAllowedOrigins = (process.env.CLIENT_URL || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const allowedOrigins = [...new Set([...defaultAllowedOrigins, ...configuredAllowedOrigins])];
+
 // Ensure MongoDB is connected before handling any requests (Serverless optimization)
 app.use(async (req, res, next) => {
   try {
@@ -44,7 +56,13 @@ app.use(async (req, res, next) => {
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: (origin, callback) => {
+      // Requests without an Origin header are allowed for server-to-server calls.
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS origin not allowed: ${origin}`));
+    },
     credentials: true,
   })
 );
