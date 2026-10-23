@@ -12,6 +12,7 @@ const NESTED_PATHS = [
   "repairService",
   "repairPrice",
   "product",
+  "gradeDefinition",
 ];
 
 export function localizeDoc(doc, lang) {

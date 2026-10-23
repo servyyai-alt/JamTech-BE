@@ -11,6 +11,18 @@ const productSchema = new mongoose.Schema(
     description: { type: String, default: "" },
     specifications: [{ key: String, value: String }],
 
+    condition: { type: String, enum: ["", "Refurbished", "To Repair"], default: "" },
+    grade: { type: String, enum: ["", "A", "B", "C"], default: "" },
+    gradeDefinition: { type: mongoose.Schema.Types.ObjectId, ref: "Grade", default: null },
+    conditionDetails: { type: String, default: "" },
+    gradeDescription: { type: String, default: "" },
+    gradeFeatures: [{ type: String }],
+    gradeDescriptions: {
+      A: { type: String, default: "" },
+      B: { type: String, default: "" },
+      C: { type: String, default: "" },
+    },
+
     regularPrice: { type: Number, required: true },
     salePrice: { type: Number },
     currency: { type: String, default: "EUR" },
@@ -45,6 +57,14 @@ const productSchema = new mongoose.Schema(
               brand: String,
               shortDescription: String,
               description: String,
+              conditionDetails: String,
+              gradeDescription: String,
+              gradeFeatures: [String],
+              gradeDescriptions: {
+                A: String,
+                B: String,
+                C: String,
+              },
               warranty: String,
               returnsPolicy: String,
               deliveryEstimate: String,

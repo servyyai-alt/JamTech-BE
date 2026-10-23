@@ -8,6 +8,7 @@ import APIFeatures from "../utils/apiFeatures.js";
 import { getOne, createOne, updateOne, deleteOne } from "../utils/handlerFactory.js";
 import slugify from "slugify";
 import { localizeDocs } from "../utils/localize.js";
+import Grade from "../models/Grade.js";
 
 const attachReviewStats = async (products) => {
   if (!products?.length) return products;
@@ -49,7 +50,7 @@ export const getProducts = catchAsync(async (req, res) => {
   if (req.query.sort === "popular") sort = "-numReviews";
   if (req.query.sort === "rating") sort = "-rating";
 
-  const features = new APIFeatures(Product.find(filter).populate("category"), req.query)
+  const features = new APIFeatures(Product.find(filter).populate("category gradeDefinition"), req.query)
     .search(["title", "brand", "tags"]);
 
   const page = Number(req.query.page) || 1;
@@ -67,12 +68,13 @@ export const getProducts = catchAsync(async (req, res) => {
 });
 
 export const getProductBySlug = catchAsync(async (req, res, next) => {
-  const product = await Product.findOne({ slug: req.params.slug, isActive: true }).populate("category");
+  const product = await Product.findOne({ slug: req.params.slug, isActive: true }).populate("category gradeDefinition");
   if (!product) return next(new AppError("Product not found.", 404));
 
   const variants = await ProductVariant.find({ product: product._id, isActive: true });
   const categoryId = product.category?._id || product.category;
   const relatedByCategory = await Product.find({ category: categoryId, _id: { $ne: product._id }, isActive: true })
+    .populate("gradeDefinition")
     .sort("-rating -numReviews -createdAt")
     .limit(4);
   let related = relatedByCategory;
@@ -81,18 +83,21 @@ export const getProductBySlug = catchAsync(async (req, res, next) => {
     const usedIds = [product._id, ...related.map((item) => item._id)];
     const fallback = await Product.find({ _id: { $nin: usedIds }, isActive: true })
       .sort("-isBestSeller -isFeatured -rating -createdAt")
+      .populate("gradeDefinition")
       .limit(4 - related.length);
     related = [...related, ...fallback];
   }
 
   await attachReviewStats([product, ...related]);
+  const grades = await Grade.find({ isActive: true }).sort("sortOrder code");
   localizeDocs(product, req.query.lang);
   localizeDocs(related, req.query.lang);
+  localizeDocs(grades, req.query.lang);
 
-  res.status(200).json({ success: true, data: { product, variants, related } });
+  res.status(200).json({ success: true, data: { product, variants, related, grades } });
 });
 
-export const getProduct = getOne(Product, { populate: "category" });
+export const getProduct = getOne(Product, { populate: "category gradeDefinition" });
 
 export const createProduct = catchAsync(async (req, res) => {
   if (!req.body.slug) req.body.slug = slugify(req.body.title, { lower: true, strict: true });
